@@ -118,6 +118,34 @@ def read_num_keys(source_line):
     return None
 
 
+# header for keyname section
+KEYNAME_HEAD = 'static XkbKeyNameRec	keyNames[NUM_KEYS]= {'
+
+# pattern for declaration of a key name
+KEYNAME_PAT = re.compile(r'\s{4}{\s+\"([A-Z0-9_\+\-]*)\"\s{2}}(,?)')
+
+def read_key_names(num_keys, source_line):
+    """\
+    Read the names of the keys, return an array with them
+    """
+    # preallocate the array
+    key_names = ['']*num_keys
+    i = 0
+    while True:
+        line = next(source_line, None)
+        if line.startswith(KEYNAME_HEAD):
+            while line != '};':
+                for m in re.finditer(KEYNAME_PAT, line):
+                    name = m.group(1)
+                    key_names[i] = name
+                    i += 1
+                line = next(source_line, None)
+            break
+    # verify that we read exactly the number of keys expected
+    log.debug('Read %d key names', i)
+    return key_names
+
+
 def read_layout_map(source):
     """\
     Read layout map from layout source code.
@@ -125,6 +153,7 @@ def read_layout_map(source):
     :param source_line: Generator that returns each line of source code.
     """
     num_keys = read_num_keys(source)
+    key_names = read_key_names(num_keys, source)
 
 
 def main(args):
