@@ -101,6 +101,15 @@ def compile_layout(layout, variant, options):
                     yield stripped
 
 
+def read_layout_map(source):
+    """\
+    Read layout map from layout source code.
+
+    :param source_line: Generator that returns each line of source code.
+    """
+    pass
+
+
 def main(args):
     # setup in main routine
     logging.basicConfig(level=logging.INFO,
@@ -125,15 +134,9 @@ def main(args):
 
     # run the layout specification through the compiler which will give us the
     # composition in the forms of C source code
-    layout = compile_layout(args.layout, args.variant, args.option)
+    layout_source = compile_layout(args.layout, args.variant, args.option)
 
-    # exhaust the generator
-    while True:
-        line = next(layout, None)
-        if line is None:
-            break
-        else:
-            pass
+    layout_map = read_layout_map(layout_source)
 
 
 if __name__ == "__main__":
