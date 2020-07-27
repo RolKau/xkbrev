@@ -1,4 +1,5 @@
 import argparse
+import enum
 import functools as fun
 import logging
 import operator as op
@@ -146,6 +147,120 @@ def read_key_names(num_keys, source_line):
     return key_names
 
 
+# the values are all different exponents of two, so that we can combine them
+# into a single value and preserve the semantics
+class Modifier(enum.Enum):
+    Shift = 2**0
+    AltGr = 2**1
+    NumLock = 2**2
+    CapsLock = 2**3
+    Super = 2**4
+    LevelFive = 2**5
+    Control = 2**6
+    Alt = 2**7
+    LeftCtrl = 2**8
+    LeftAlt = 2**9
+    RightCtrl = 2**10
+    RightAlt = 2**11
+
+
+# mapping of modifier names as used in the source code, to the modifier enum
+MOD_NAME_TO_ENUM = {
+    'Shift': Modifier.Shift,
+    'Lock': Modifier.CapsLock,
+    'Control': Modifier.Control,
+    'NumLoc': Modifier.NumLock,
+    'LevelThre': Modifier.AltGr,
+    'Mod4': Modifier.Super,
+    'Al': Modifier.Alt,
+    'LevelFiv': Modifier.LevelFive,
+    'LAl': Modifier.LeftAlt,
+    'RAl': Modifier.RightAlt,
+    'LContro': Modifier.LeftCtrl,
+    'RContro': Modifier.RightCtrl,
+}
+
+
+# key type definitions start with this line; this also ends modifier maps
+KEYTYPE_HEAD = 'static XkbKeyTypeRec dflt_types[]= {'
+
+# header that introduces each activation map, and pattern for each line in it
+ACT_HEAD_PAT = r'static XkbKTMapEntryRec map_([A-Z0-9_]+)\[([0-9]+)\]= {'
+ACT_REC_PAT = r'\s+{\s*([01]),\s*([0-9]+),\s*{\s*(.*),\s*(.*),\s*(.*)\s}\s},?'
+
+def read_activation_map(source_line):
+    """\
+    Activation map is a dictionary where the key is the name of the type and the
+    content is a dictionary where the key is a bitmask of modifiers and the value
+    is the level that is activated by this combination of modifiers, when a key
+    is of that type.
+    """
+    # there is always a default 'ONE_LEVEL', with a level that is activated
+    # regardless of any modifiers
+    act_map = {'ONE_LEVEL': {0: 0}}
+    while True:
+        line = next(source_line, None)
+        # type entries go on until this line appears
+        if line.startswith(KEYTYPE_HEAD):
+            # ask the iterator to unget the last line
+            source_line.send(True)
+            break
+        # if we find a map record, the start parsing its entries
+        m = re.match(ACT_HEAD_PAT, line)
+        if m is not None:
+            # the number of lines are specified in the declaration
+            map_name = m.group(1)
+            num_rec = int(m.group(2))
+            log.debug("Key type %s contains %d activations", map_name, num_rec)
+            # pre-allocate an empty activation record; no modifiers always
+            # activates the first level declared
+            act_rec = {0: 0}
+            # read each activation record
+            for i in range(num_rec):
+                line = next(source_line, None)
+                m = re.match(ACT_REC_PAT, line)
+                if m is None:
+                    log.fatal("Map entry does not match expected pattern")
+                    log.fatal("%s", line)
+                    break
+                # first column indicates if this level determines shift
+                shift = bool(m.group(1))
+                # second column is the level this combination controls
+                level = int(m.group(2))
+                # third column is the modifiers that applies to this level
+                mods = m.group(3).split('|')
+                # fourth column should be the same as third in the
+                # auto-generated files
+                if m.group(4) != m.group(3):
+                    log.warning("Unexpected modifier declaration")
+                # fifth column is additional modifiers
+                mods.extend(m.group(5).split('|'))
+                # remove both prefix and suffix from modifiers
+                mods = [m[len('vmod_'):] if m.startswith('vmod_') else m
+                        for m in mods]
+                mods = [m[:-len('Mask')] if m.endswith('Mask') else m
+                        for m in mods]
+                # normal state is not a modifier
+                mods = list(filter(lambda x: x != '0', mods))
+                # map to modifier enum
+                mods = [MOD_NAME_TO_ENUM[m] for m in mods]
+                log.debug("Level %d is activated on modifiers %s", level,
+                          ', '.join([m.name for m in mods]))
+                bitmask = sum([m.value for m in mods])
+                act_rec[bitmask] = level
+
+            # create a set of activation records for this map
+            act_map[map_name] = act_rec
+
+            # expect the end of the record next, after the entries
+            line = next(source_line, None)
+            if line != '};':
+                log.fatal("Unexpected end of map entry record")
+
+    # return the collected activation map for all key types
+    return act_map
+
+
 def read_layout_map(source):
     """\
     Read layout map from layout source code.
@@ -154,6 +269,7 @@ def read_layout_map(source):
     """
     num_keys = read_num_keys(source)
     key_names = read_key_names(num_keys, source)
+    act_map = read_activation_map(source)
 
 
 def main(args):
