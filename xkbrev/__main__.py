@@ -314,6 +314,45 @@ def read_key_types(source_line):
     return key_types
 
 
+# list of symbols are started with this declaration
+SYMBOLS_HEAD = 'static KeySym\tsymCache[NUM_SYMBOLS]= {'
+
+
+def read_symbol_list(source_line):
+    """\
+    The symbols that can be outputted for each key are stored as the data
+    section of a sparse array; all the data just follows eachother, and then
+    there is an index array that tells where one ends and the next starts.
+    """
+    # discard source lines until we arrive at our header line
+    while True:
+        line = next(source_line, None)
+        if line.startswith(SYMBOLS_HEAD):
+            break
+
+    # start out with an empty list
+    symbols = []
+
+    # now read the list of symbols until the list ends
+    while True:
+        line = next(source_line, None)
+        if line == '};':
+            break
+
+        # massage the line into a comma-separated list of symbols without any
+        # whitespace and the XK_ prefix (which are identifiers in the C code)
+        sym_list = line.strip()
+        sym_list = sym_list[:-1] if sym_list.endswith(',') else sym_list
+        sym_list = sym_list.split(',')
+        sym_list = [s.strip() for s in sym_list]
+        sym_list = [s[len('XK_'):] if s.startswith('XK_') else s
+                    for s in sym_list]
+        symbols.extend(sym_list)
+
+    log.debug('Read %d symbols', len(symbols))
+    return symbols
+
+
 def read_layout_map(source):
     """\
     Read layout map from layout source code.
@@ -324,6 +363,7 @@ def read_layout_map(source):
     key_names = read_key_names(num_keys, source)
     act_map = read_activation_map(source)
     key_types = read_key_types(source)
+    symbols = read_symbol_list(source)
 
 
 def main(args):
