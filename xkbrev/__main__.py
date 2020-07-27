@@ -101,13 +101,30 @@ def compile_layout(layout, variant, options):
                     yield stripped
 
 
+# pattern to recognize the declaration of the number of keys
+NUMKEY_PAT = re.compile(r'^#define NUM_KEYS\s+([0-9]+)')
+
+def read_num_keys(source_line):
+    """\
+    Read the number of virtual keys defined in the layout
+    """
+    while True:
+        line = next(source_line, None)
+        m = re.match(NUMKEY_PAT, line)
+        if m is not None:
+            number = int(m.group(1))
+            log.debug("Number of keys: %d", number)
+            return number
+    return None
+
+
 def read_layout_map(source):
     """\
     Read layout map from layout source code.
 
     :param source_line: Generator that returns each line of source code.
     """
-    pass
+    num_keys = read_num_keys(source)
 
 
 def main(args):
