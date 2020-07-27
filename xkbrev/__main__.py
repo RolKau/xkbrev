@@ -91,7 +91,14 @@ def compile_layout(layout, variant, options):
             if len(line) == 0:
                 break
             else:
-                yield(line.rstrip())
+                # if someone sends a True value into the generator, then repeat
+                # the previous line one more time
+                stripped = line.rstrip()
+                again = yield(stripped)
+                if again:
+                    # the first value is yielded to the 'send' function
+                    yield None
+                    yield stripped
 
 
 def main(args):
