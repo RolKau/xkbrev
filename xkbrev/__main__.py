@@ -353,6 +353,50 @@ def read_symbol_list(source_line):
     return symbols
 
 
+# header and entry for each of the symbol triplets
+SYMMAP_HEAD = 'static XkbSymMapRec\tsymMap[NUM_KEYS]= {'
+SYMMAP_PAT = r'\s*{\s*([0-9]+),\s*0x([01]),\s*([0-9]+)\s*},?'
+
+
+def read_key_map(source_line):
+    """\
+    Read a definition for each virtual key: the key type index and the starting
+    position in the flat symbol list
+    """
+    # discard source lines until we arrive at our header line
+    while True:
+        line = next(source_line, None)
+        if line.startswith(SYMMAP_HEAD):
+            break
+
+    key_map = []
+
+    # read key mapping until we read the end symbol of the list
+    while True:
+        line = next(source_line, None)
+        if line == '};':
+            break
+
+        for m in re.finditer(SYMMAP_PAT, line):
+            # first item in the key type index
+            type_index = int(m.group(1))
+            # second item is the number of groups; note that we only support
+            # zero or one groups; we don't have any code to handle more than one
+            # group for the time being
+            num_groups = int(m.group(2))
+            # third item is the offset in the flat symbols list
+            offset = int(m.group(3))
+
+            # create an entry for this key
+            key_map.append({
+                'type': type_index,
+                'defined': num_groups > 0,
+                'offset': offset
+            })
+
+    return key_map
+
+
 def read_layout_map(source):
     """\
     Read layout map from layout source code.
@@ -364,6 +408,7 @@ def read_layout_map(source):
     act_map = read_activation_map(source)
     key_types = read_key_types(source)
     symbols = read_symbol_list(source)
+    key_map = read_key_map(source)
 
 
 def main(args):
