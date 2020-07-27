@@ -261,6 +261,59 @@ def read_activation_map(source_line):
     return act_map
 
 
+def read_key_types(source_line):
+    """\
+    Create a list of which key type index that has which name
+    """
+    key_types = []
+    # discard source lines until we arrive at our header line
+    while True:
+        line = next(source_line, None)
+        if line == KEYTYPE_HEAD:
+            break
+
+    # now read the list of types
+    while True:
+        # each type consists of six lines: first line is just an opening brace,
+        # unless it is the end of the map (the actual number of entries is not
+        # defined as a readily available number, so we build a dynamic list)
+        line = next(source_line, None)
+        if line == '};':
+            break
+        if line != '    {':
+            log.fatal('Parsing error: Expected opening brace')
+        # second line is the modifiers that are in use; we already know this
+        # from the activation map, so we can just ignore it
+        line = next(source_line, None)
+        # third line is the number of levels which is defined for this type
+        line = next(source_line, None)
+        num_levels = int(line.split(',')[0].strip())
+        # fourth line is a comma-separated list where the first item is the
+        # number of activation records for this type (which we already know, the
+        # second item is the name of the key type, in form of the identifier
+        # that was used to declare the map further above, and the last item is
+        # either NULL or a preserve_ pointer. however, we don't use this variant
+        # because it won't pick up types without a map_
+        line = next(source_line, None)
+        # fifth line is a comma-separated list where the first item is always
+        # None as an unused field for the name, and the second is the identifier
+        # for the atom that contains the name
+        line = next(source_line, None)
+        map_name = line.split(',')[1].strip()
+        map_name = (map_name[len('lnames_'):] if map_name.startswith('lnames_')
+                    else map_name)
+        # sixth line is the closing brace
+        line = next(source_line, None)
+        if not line.startswith('    }'):
+            log.fatal('Parsing error: Expected closing brace')
+        # build an entry for this type and put in the list
+        key_types.append({'name': map_name, 'levels': num_levels})
+
+    # this is a list that contains the name of each type, in the position that
+    # is used as 'key index' in the symbol table
+    return key_types
+
+
 def read_layout_map(source):
     """\
     Read layout map from layout source code.
@@ -270,6 +323,7 @@ def read_layout_map(source):
     num_keys = read_num_keys(source)
     key_names = read_key_names(num_keys, source)
     act_map = read_activation_map(source)
+    key_types = read_key_types(source)
 
 
 def main(args):
