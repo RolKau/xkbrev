@@ -449,6 +449,45 @@ def read_layout_map(source):
     return layout_map
 
 
+# header file definition of a named key symbol
+SYMDEF_PAT = re.compile(r'^#define\sXK_([A-Za-z_0-9]+)\s+0x0*([A-Fa-f0-9]+)' +
+                        r'(\s\s\/\* U\+0*([A-Fa-f0-9]+)\s.*)?.*$')
+
+
+def read_symbol_map():
+    """\
+    Get a map with a pair of the character and possibly unicode key that is
+    generated, for each defined symbol.
+    """
+    sym_map = {}
+
+    # read symbols from this (hardcoded) file; the key symbols always mean the
+    # same, regardless of layout and keyboard selected
+    with open('/usr/include/X11/keysymdef.h', 'rt') as f:
+        while True:
+            # read until end of file
+            line = f.readline()
+            if len(line) == 0:
+                break
+
+            # look for symbol definitions
+            m = re.match(SYMDEF_PAT, line)
+            if m is None:
+                continue
+
+            # decode the definition; the first group is the symbol name, the
+            # second is the character code, and the third is the unicode of the
+            # code, if defined, otherwise None
+            sym_name = m.group(1)
+            sym_char = int(m.group(2), 16)
+            sym_unic = None if m.group(4) is None else int(m.group(4), 16)
+
+            # collect these in the global dictionary
+            sym_map[sym_name] = (sym_char, sym_unic)
+
+    return sym_map
+
+
 def main(args):
     # setup in main routine
     logging.basicConfig(level=logging.INFO,
@@ -476,6 +515,7 @@ def main(args):
     layout_source = compile_layout(args.layout, args.variant, args.option)
 
     layout_map = read_layout_map(layout_source)
+    symbol_map = read_symbol_map()
 
 
 if __name__ == "__main__":
