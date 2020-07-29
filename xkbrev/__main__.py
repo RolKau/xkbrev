@@ -4,6 +4,7 @@ import functools as fun
 import logging
 import operator as op
 import os
+import os.path as path
 import re
 import subprocess
 import sys
@@ -488,6 +489,52 @@ def read_symbol_map():
     return sym_map
 
 
+# definition of key code for a virtual key,
+KEYCODE_PAT = re.compile(r'^\s*<([^>]+)>\s*=\s*([0-9]+);.*')
+ALIAS_PAT = re.compile(r'^\s*alias\s<([^>]+)>\s*=\s*<([^>]+)>;.*')
+
+
+def read_keycode_map(name):
+    """\
+    Read scancode definition for a particular kind of input system.
+
+    :return: List that is indexed by scancode, with virtual key name for this
+             scancode, or None if not defined
+    """
+    key_codes = {}
+    max_key_code = 0
+    with open(path.join('/usr/share/X11/xkb/keycodes', name), 'rt') as f:
+        while True:
+            # read until end of file
+            line = f.readline()
+            if len(line) == 0:
+                break
+
+            # read definition; first group is the name of the keycode,
+            # the second group is the scancode.
+            m = re.match(KEYCODE_PAT, line)
+            if m is not None:
+                scancode = int(m.group(2))
+                key_codes[m.group(1)] = scancode
+                # keep track of the largest value seen
+                max_key_code = max(max_key_code, scancode)
+                continue
+
+            # if we didn't get a definition, maybe it is an alias
+            m = re.match(ALIAS_PAT, line)
+            if m is not None:
+                key_codes[m.group(1)] = key_codes[m.group(2)]
+
+    # now turn everything inside-out; we want a list indexed by the scancode,
+    # giving the virtual key code
+    scancode_map = [None] * (max_key_code+1)
+    for _, (virt_key, scancode) in enumerate(key_codes.items()):
+        log.debug('virt_key = %s, scancode = %d', virt_key, scancode)
+        scancode_map[scancode] = virt_key
+
+    return scancode_map
+
+
 def main(args):
     # setup in main routine
     logging.basicConfig(level=logging.INFO,
@@ -516,6 +563,7 @@ def main(args):
 
     layout_map = read_layout_map(layout_source)
     symbol_map = read_symbol_map()
+    keycode_map = read_keycode_map('xfree86')
 
 
 if __name__ == "__main__":
