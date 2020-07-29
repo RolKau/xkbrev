@@ -603,6 +603,7 @@ def write_xrdp(layout_map, symbol_map, keycode_map, outf):
 def main(args):
     # setup in main routine
     logging.basicConfig(level=logging.INFO,
+                        handlers= [logging.StreamHandler(sys.stderr)],
                         format="%(levelname).1s: %(message).76s")
 
     # parse command-line arguments; this program intentionally takes the same
@@ -641,5 +642,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    import sys
     main(sys.argv[1:])
