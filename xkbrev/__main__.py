@@ -147,8 +147,7 @@ def read_key_names(num_keys, source_line):
     return key_names
 
 
-# the values are all different exponents of two, so that we can combine them
-# into a single value and preserve the semantics
+# enumeration of various modifier keys that can be pressed
 class Modifier(enum.Enum):
     Shift = 2**0
     AltGr = 2**1
@@ -197,7 +196,7 @@ def read_activation_map(source_line):
     """
     # there is always a default 'ONE_LEVEL', with a level that is activated
     # regardless of any modifiers
-    act_map = {'ONE_LEVEL': {0: 0}}
+    act_map = {'ONE_LEVEL': {frozenset(): 0}}
     while True:
         line = next(source_line, None)
         # type entries go on until this line appears
@@ -214,7 +213,7 @@ def read_activation_map(source_line):
             log.debug("Key type %s contains %d activations", map_name, num_rec)
             # pre-allocate an empty activation record; no modifiers always
             # activates the first level declared
-            act_rec = {0: 0}
+            act_rec = {frozenset(): 0}
             # read each activation record
             for i in range(num_rec):
                 line = next(source_line, None)
@@ -246,8 +245,7 @@ def read_activation_map(source_line):
                 mods = [MOD_NAME_TO_ENUM[m] for m in mods]
                 log.debug("Level %d is activated on modifiers %s", level,
                           ', '.join([m.name for m in mods]))
-                bitmask = sum([m.value for m in mods])
-                act_rec[bitmask] = level
+                act_rec[frozenset(mods)] = level
 
             # create a set of activation records for this map
             act_map[map_name] = act_rec
