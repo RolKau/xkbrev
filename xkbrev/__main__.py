@@ -1,4 +1,5 @@
 import argparse
+import collections as col
 import enum
 import functools as fun
 import logging
@@ -535,6 +536,70 @@ def read_keycode_map(name):
     return scancode_map
 
 
+# modifier combinations that have their own sections in XRDP format
+XRDP_MODS = col.OrderedDict([
+    ('noshift', frozenset()),
+    ('shift', frozenset([Modifier.Shift])),
+    ('altgr', frozenset([Modifier.AltGr])),
+    ('shiftaltgr', frozenset([Modifier.Shift, Modifier.AltGr])),
+    ('capslock', frozenset([Modifier.CapsLock])),
+    ('capslockaltgr', frozenset([Modifier.CapsLock, Modifier.AltGr])),
+    ('shiftcapslock', frozenset([Modifier.Shift, Modifier.CapsLock])),
+    ('shiftcapslockaltgr', frozenset(
+        [Modifier.Shift, Modifier.CapsLock, Modifier.AltGr]))
+])
+
+
+def write_xrdp(layout_map, symbol_map, keycode_map, outf):
+    """\
+    Regenerate the keyboard layout in the format expected by XRDP.
+
+    :param layout_map: Map for virtual key + modifier to symbol
+    :param symbol_map: Map for symbol to character code and unicode
+    :param keycode_map: Map for scancode to virtual key
+    :param outf: File that will receive generated keymap in XRDP format
+    """
+    # write each section separately
+    for ndx, section in enumerate(XRDP_MODS):
+        # section header
+        outf.write("[{0:s}]\n".format(section))
+
+        # key definitions
+        mods = XRDP_MODS[section]
+        for keycode, virt_key in enumerate(keycode_map):
+            # only generate entries for keycodes that have an associated virtual
+            # key (otherwise it is an unused scancode)
+            if virt_key is None:
+                continue
+
+            # if there is nothing defined for this virtual key in the layout,
+            # then just skip it as well
+            if virt_key not in layout_map:
+                continue
+
+            # if this combination of virtual key and modifiers doesn't exist,
+            # then drop it
+            if mods not in layout_map[virt_key]:
+                continue
+
+            # there is a symbol for this combination; look up the character and
+            # possibly printable code, and generate an entry for it
+            sym = layout_map[virt_key][mods]
+
+            # if there is no character for this symbol, generate empty entry
+            char, unic = symbol_map[sym] if sym in symbol_map else (0, 0)
+
+            # write all the gathered information to file
+            outf.write("Key{0:d}={1:d}:{2:d}\n".format(keycode,
+                0 if char is None else char, 0 if unic is None else unic))
+            log.debug("key = %s, modifier = %s: symbol = %s",
+                      virt_key, ",".join([m.name for m in mods]), chr(char))
+
+        # newline at end of each section, unless it's the last
+        if ndx < len(XRDP_MODS) - 1:
+            outf.write("\n")
+
+
 def main(args):
     # setup in main routine
     logging.basicConfig(level=logging.INFO,
@@ -549,6 +614,7 @@ def main(args):
     parser.add_argument("-layout", type=str, required=False)
     parser.add_argument("-variant", type=str, required=False)
     parser.add_argument("-option", type=str, action='append')
+    parser.add_argument("--generate", choices = ['xrdp'])
     args = parser.parse_args ()
 
     # alter verbosity if specified on the command-line
@@ -561,9 +627,17 @@ def main(args):
     # composition in the forms of C source code
     layout_source = compile_layout(args.layout, args.variant, args.option)
 
+    # parse the layout definition source file into a data structure
     layout_map = read_layout_map(layout_source)
     symbol_map = read_symbol_map()
-    keycode_map = read_keycode_map('xfree86')
+
+    # write appropriate output format. XRDP uses the base rules, which again
+    # uses the xfree86 input system (and not evdev, which is more common
+    # natively) in order to be compatible with the x11vnc backend, so we must
+    # load the mapping for that input system too
+    if args.generate == 'xrdp':
+        keycode_map = read_keycode_map('xfree86')
+        write_xrdp(layout_map, symbol_map, keycode_map, sys.stdout)
 
 
 if __name__ == "__main__":
