@@ -400,6 +400,10 @@ def read_layout_map(source):
     Read layout map from layout source code.
 
     :param source_line: Generator that returns each line of source code.
+
+    :return: Dictionary indexed by virtual key name, containing a new dictionary
+             indexed by a (frozen) set of modifiers, containing the symbol that
+             is generated for this particular combination of key and modifiers.
     """
     num_keys = read_num_keys(source)
     key_names = read_key_names(num_keys, source)
@@ -407,6 +411,42 @@ def read_layout_map(source):
     key_types = read_key_types(source)
     symbols = read_symbol_list(source)
     key_map = read_key_map(source)
+
+    # key_map is a list with an entry for each keycode used in this particular
+    # layout; we want to convert this to a dictionary of key names
+    layout_map = {}
+    for ndx, keydef in enumerate(key_map):
+        # if there is no definition of this key, then we don't add it to the
+        # final dictionary
+        if not keydef['defined']:
+            continue
+
+        # get the virtual, scancode-independent name of the _key_ (not the
+        # character that is generated)
+        virt_key = key_names[ndx]
+
+        # get the type that is designated for this particular key
+        t = key_types[keydef['type']]
+
+        # this is the offset into the flat symbols list where the levels for
+        # this particular key starts
+        ofs = keydef['offset']
+
+        # build a list of level-to-symbol for this particular key
+        sym = [''] * t['levels']
+        for level in range(t['levels']):
+            sym[level] = symbols[ofs + level]
+
+        # generate an entry for each activation combination of modifiers for
+        # this particular type
+        sym_for_mods = {}
+        for _, (mods, level) in enumerate(act_map[t['name']].items()):
+            sym_for_mods[mods] = sym[level]
+
+        # add to the global map for this particular virtual key
+        layout_map[virt_key] = sym_for_mods
+
+    return layout_map
 
 
 def main(args):
