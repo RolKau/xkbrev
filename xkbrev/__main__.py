@@ -515,8 +515,13 @@ def read_keycode_map(name):
             # the second group is the scancode.
             m = re.match(KEYCODE_PAT, line)
             if m is not None:
+                virt_key = m.group(1)
                 scancode = int(m.group(2))
-                key_codes[m.group(1)] = scancode
+                # if we have already seen the virtual key, then we are past the
+                # initial basic definition and have started on auxiliary
+                # definitions; we don't use those, so skip any redefinitions
+                if virt_key not in key_codes:
+                    key_codes[virt_key] = scancode
                 # keep track of the largest value seen
                 max_key_code = max(max_key_code, scancode)
                 continue
