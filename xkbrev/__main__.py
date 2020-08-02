@@ -621,6 +621,7 @@ def main(args):
     parser.add_argument("-variant", type=str, required=False)
     parser.add_argument("-option", type=str, action='append')
     parser.add_argument("--generate", choices = ['xrdp'])
+    parser.add_argument("--output", type=str, nargs="?", default='-')
     args = parser.parse_args ()
 
     # alter verbosity if specified on the command-line
@@ -637,13 +638,23 @@ def main(args):
     layout_map = read_layout_map(layout_source)
     symbol_map = read_symbol_map()
 
-    # write appropriate output format. XRDP uses the base rules, which again
-    # uses the xfree86 input system (and not evdev, which is more common
-    # natively) in order to be compatible with the x11vnc backend, so we must
-    # load the mapping for that input system too
-    if args.generate == 'xrdp':
-        keycode_map = read_keycode_map('xfree86')
-        write_xrdp(layout_map, symbol_map, keycode_map, sys.stdout)
+    try:
+        # if a filename has been specified, then redirect output to that
+        if args.output == '-':
+            outf = sys.stdout
+        else:
+            outf = open(args.output, 'w+t')
+
+        # write appropriate output format. XRDP uses the base rules, which again
+        # uses the xfree86 input system (and not evdev, which is more common
+        # natively) in order to be compatible with the x11vnc backend, so we
+        # must load the mapping for that input system too
+        if args.generate == 'xrdp':
+            keycode_map = read_keycode_map('xfree86')
+            write_xrdp(layout_map, symbol_map, keycode_map, outf)
+
+    finally:
+        outf.close()
 
 
 if __name__ == "__main__":
