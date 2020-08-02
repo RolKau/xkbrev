@@ -625,6 +625,7 @@ def main(args):
     parser.add_argument("-layout", type=str, required=False)
     parser.add_argument("-variant", type=str, required=False)
     parser.add_argument("-option", type=str, action='append')
+    parser.add_argument("-options", type=str, nargs="?")
     parser.add_argument("--generate", choices = ['xrdp'])
     parser.add_argument("--output", type=str, nargs="?", default='-')
     args = parser.parse_args ()
@@ -639,7 +640,12 @@ def main(args):
 
     # run the layout specification through the compiler which will give us the
     # composition in the forms of C source code
-    layout_source = compile_layout(args.layout, args.variant, args.option)
+    options = []
+    if args.option is not None:
+        options.extend(args.option)
+    if args.options is not None:
+        options.extend(args.options.split(','))
+    layout_source = compile_layout(args.layout, args.variant, options)
 
     # parse the layout definition source file into a data structure
     layout_map = read_layout_map(layout_source)
