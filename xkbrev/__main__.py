@@ -620,6 +620,8 @@ def main(args):
     parser.add_argument("-q", "--quiet", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("-rules", type=str, required=False)
+    parser.add_argument("-model", type=str, required=False)
     parser.add_argument("-layout", type=str, required=False)
     parser.add_argument("-variant", type=str, required=False)
     parser.add_argument("-option", type=str, action='append')
