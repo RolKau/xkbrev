@@ -25,7 +25,7 @@ def identify_layout(f):
     """\
     Determine which keyboard layout an input specification is for.
     """
-    log.debug("Parsing setxkbmap output")
+    log.info("Parsing setxkbmap output")
     f.seek(os.SEEK_SET, 0)
     while True:
         line = f.readline()
@@ -47,7 +47,7 @@ def identify_layout(f):
 
     # this indicates that we read through the entire output, but didn't
     # get any match; setxkbmap didn't return a proper result
-    log.debug("Did not find an xkb_symbols line")
+    log.warning("Did not find an xkb_symbols line")
     return None
 
 
@@ -116,7 +116,7 @@ def read_num_keys(source_line):
         m = re.match(NUMKEY_PAT, line)
         if m is not None:
             number = int(m.group(1))
-            log.debug("Number of keys: %d", number)
+            log.info("Number of keys: %d", number)
             return number
     return None
 
@@ -145,7 +145,7 @@ def read_key_names(num_keys, source_line):
                 line = next(source_line, None)
             break
     # verify that we read exactly the number of keys expected
-    log.debug('Read %d key names', i)
+    log.info('Read %d key names', i)
     return key_names
 
 
@@ -349,7 +349,7 @@ def read_symbol_list(source_line):
                     for s in sym_list]
         symbols.extend(sym_list)
 
-    log.debug('Read %d symbols', len(symbols))
+    log.info('Read %d symbols', len(symbols))
     return symbols
 
 
@@ -607,7 +607,7 @@ def write_xrdp(layout_map, symbol_map, keycode_map, outf):
 
 def main(args):
     # setup in main routine
-    logging.basicConfig(level=logging.INFO,
+    logging.basicConfig(level=logging.WARNING,
                         handlers= [logging.StreamHandler(sys.stderr)],
                         format="%(levelname).1s: %(message).76s")
 
@@ -617,6 +617,7 @@ def main(args):
     parser = argparse.ArgumentParser ()
     parser.add_argument("-q", "--quiet", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--debug", action="store_true")
     parser.add_argument("-layout", type=str, required=False)
     parser.add_argument("-variant", type=str, required=False)
     parser.add_argument("-option", type=str, action='append')
@@ -626,6 +627,8 @@ def main(args):
 
     # alter verbosity if specified on the command-line
     if args.verbose:
+        log.setLevel(logging.INFO)
+    elif args.debug:
         log.setLevel(logging.DEBUG)
     elif args.quiet:
         log.setLevel(logging.WARNING)
