@@ -1,3 +1,5 @@
+# Copyright (C) 2020 Roland Kaufmann
+
 import argparse
 import collections as col
 import enum
